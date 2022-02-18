@@ -258,36 +258,88 @@ total number of hits, and the year they were inducted into the hall of fame
 Note that a player being inducted into the hall of fame is indicated by a 'Y' in the 
 **inducted** column of the halloffame table.
 */
-WITH hof AS (
+WITH batting_totals AS (
+	SELECT
+		DISTINCT playerid,
+		SUM(b.h) AS batting_total
+	FROM batting AS b
+	GROUP BY playerid
+	HAVING SUM(b.h) >= 3000
+),
+hof AS (
 	SELECT 
 		h.playerid AS playerid, 
-		p.namefirst || ' ' || p.namelast AS name,
-		h.yearid AS yearid, 
-		CASE
-			WHEN h.inducted = 'Y' THEN h.yearid
-			ELSE NULL
-		END AS induction_year
+		h.yearid
  	FROM halloffame AS h
-	INNER JOIN people AS p
-	USING (playerid)
-),
-batting_total AS (
-	SELECT
-		playerid,
-		SUM(b.h) AS batting_total
-	FROM people
-	INNER JOIN batting AS b
-	USING (playerid)
-	GROUP BY playerid
+	WHERE inducted = 'Y' 
 )
 SELECT 
-	h.name, 
-	batting_total,
-	h.induction_year
-FROM hof AS h
-INNER JOIN batting_total AS b
+	p.namefirst || ' ' || p.namelast AS name, 
+	b.batting_total,
+	h.yearid
+FROM batting_totals AS b
+LEFT JOIN hof AS h
 USING (playerid)
-WHERE batting_total >= 3000
-ORDER BY h.name
+INNER JOIN people AS p
+USING (playerid)
+ORDER BY b.batting_total
+
+/*
+Question 9: Find all players who had at least 1,000 hits for two different teams. 
+Report those players' full names.
+*/
+WITH two_teams AS (
+	SELECT 
+		playerid
+	FROM batting
+	GROUP BY playerid
+	HAVING COUNT(DISTINCT teamid) = 2
+),
+batting_1000 AS (	
+	SELECT 
+		playerid,
+		teamid,
+		SUM(h) AS total_hits
+	FROM batting
+	GROUP BY playerid, teamid
+	HAVING SUM(h) >= 1000
+)
+SELECT 
+	DISTINCT p.namefirst || ' ' || p.namelast AS name
+FROM two_teams AS t
+INNER JOIN batting_1000 AS b
+USING (playerid)
+INNER JOIN people AS p
+USING (playerid)
+ORDER BY name
+
+/*
+Question 10: Find all players who hit their career highest number of home runs in 2016. 
+Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. 
+Report the players' first and last names and the number of home runs they hit in 2016.
+*/
+SELECT 
+	DISTINCT playerid
+FROM batting
+GROUP BY playerid
+HAVING COUNT(DISTINCT yearid) >= 10
+ORDER BY playerid
+
+SELECT 
+	playerid,
+	yearid,
+	SUM(hr)
+FROM batting
+WHERE playerid IN (
+	SELECT 
+		DISTINCT playerid
+		FROM batting
+		GROUP BY playerid
+		HAVING COUNT(DISTINCT yearid) >= 10
+)
+GROUP BY playerid, yearid
+ORDER BY playerid, yearid
+
+
 
 
